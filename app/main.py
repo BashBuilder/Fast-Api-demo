@@ -1,114 +1,63 @@
-from fastapi import FastAPI, status, HTTPException, Response
-from pydantic import BaseModel
-from psycopg2.extras import RealDictCursor
-from time import sleep
-from psycopg2 import connect
+from fastapi import FastAPI, status, HTTPException, Response, Depends
+from .database import engine, get_db
+from . import models
+from sqlalchemy.orm import Session
+from .schema import CreatePost, UpdatePost, Post
+
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-class Post(BaseModel):
-  id: int
-  title : str
-  content: str
-  published: bool = True
-  rating : int | None = None
   
+@app.get("/posts", response_model=list[Post])
+def get_posts(db : Session = Depends(get_db)):
+  posts = db.query(models.Post).all()
+  return posts
+
+
+
+@app.post("/posts", status_code=status.HTTP_201_CREATED, response_model=Post)
+def create_posts(payload: CreatePost, db : Session = Depends(get_db)):
+  post = models.Post(**payload.model_dump())
   
-class CreatePost(BaseModel):
-  title : str
-  content: str
+  db.add(post)
+  db.commit()
+  db.refresh(post)
+  
+  return post
 
 
-my_post : list[Post] = [
-  Post.model_validate({
-    "id": 1,
-    "title": "My First Post",
-    "content": "This is my first post",
-    "published": True,
-    "rating": 5
-  }),
-  Post.model_validate( {
-    "id": 2,
-    "title": "My Second Post",
-    "content": "This is my second post",
-    "published": False,
-    "rating": 3 
-  }),
-  Post.model_validate( {
-    "id": 3,
-    "title": "My Third Post",
-    "content": "This is my third post",
-    "published": True,
-    "rating": 4
-  })
-]
-
-while True:
-  try : 
-    conn = connect(host="localhost", port=5432, user="postgres", password="postgres", database="fastapi", cursor_factory=RealDictCursor)
-    cursor = conn.cursor()
-    print("Connected to database")
-    break
-  except Exception as error :
-    print("Error connecting to database")
-    print("Error", error)
-    sleep(2)
-
-
-def find_post(id: int) : 
-    cursor.execute("SELECT * FROM posts WHERE id = %s", (id,))
-    post = cursor.fetchone()
+@app.get("/posts/{id}", response_model=Post)
+def get_post(id: int, db : Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == id).first()
     if not post:
       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    return post
-  
-
-
-  
-  
-@app.get("/posts")
-def get_posts():
-  cursor.execute("SELECT * FROM posts")
-  posts = cursor.fetchall()
-  return {"data" : posts}
-
-
-
-@app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_posts(payload: CreatePost):
-  cursor.execute("INSERT INTO posts (title, content ) VALUES (%s, %s) RETURNING *", (payload.title, payload.content))
-  post = cursor.fetchone()
-  conn.commit()
-  return {"data" : post}
-
-
-@app.get("/posts/{id}")
-def get_post(id: int):
-    post = find_post(id)
     
-    return {"data": post}
+    return post
+
   
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id: int): 
-  post = find_post(id)
-  
+def delete_post(id: int, db : Session = Depends(get_db)):
+  post = db.query(models.Post).filter(models.Post.id == id).first()
   if not post:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
   
-  cursor.execute("DELETE FROM posts WHERE id = %s", (id,))
-  conn.commit()
-
+  db.delete(post)
+  db.commit()
+  
   return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-@app.put("/posts/{id}")
-def update_post(id: int, payload: Post):
-  post = find_post(id)
+@app.put("/posts/{id}", response_model=Post)
+def update_post(id: int, payload: UpdatePost, db : Session = Depends(get_db)):
+  post = db.query(models.Post).filter(models.Post.id == id)
   
-  if not post:
+  if not post.first():
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
-  cursor.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s RETURNING *", (payload.title, payload.content, id))
-  conn.commit()
+  post.update(payload.model_dump(), synchronize_session=False)  # type: ignore
+
+  db.commit()
   
-  return {"data": post}
+  return post.first()
       
