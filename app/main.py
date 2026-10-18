@@ -1,5 +1,8 @@
 from fastapi import FastAPI, status, HTTPException, Response
 from pydantic import BaseModel
+from psycopg2.extras import RealDictCursor
+from time import sleep
+from psycopg2 import connect
 
 app = FastAPI()
 
@@ -45,6 +48,19 @@ def find_post(id: int) :
       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
   
   return found_post
+
+print("Connecting to database")
+
+while True:
+  try : 
+    conn = connect(host="localhost", port=5432, user="postgres", password="postgres", database="fastapi", cursor_factory=RealDictCursor)
+    cursor = conn.cursor()
+    print("Connected to database")
+    break
+  except Exception as error :
+    print("Error connecting to database")
+    print("Error", error)
+    sleep(2)
 
 
 @app.get("/")
