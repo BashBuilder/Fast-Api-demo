@@ -12,6 +12,11 @@ class Post(BaseModel):
   content: str
   published: bool = True
   rating : int | None = None
+  
+  
+class CreatePost(BaseModel):
+  title : str
+  content: str
 
 
 my_post : list[Post] = [
@@ -38,19 +43,6 @@ my_post : list[Post] = [
   })
 ]
 
-def find_post(id: int) : 
-  found_post = None
-  for post in my_post:
-    if post.id == id:
-      found_post = post
-      break
-    if not post:
-      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-  
-  return found_post
-
-print("Connecting to database")
-
 while True:
   try : 
     conn = connect(host="localhost", port=5432, user="postgres", password="postgres", database="fastapi", cursor_factory=RealDictCursor)
@@ -63,24 +55,31 @@ while True:
     sleep(2)
 
 
-@app.get("/")
-def root(): 
-  return {"message": "Hello World"}
+def find_post(id: int) : 
+    cursor.execute("SELECT * FROM posts WHERE id = %s", (id,))
+    post = cursor.fetchone()
+    if not post:
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return post
+  
+
+
   
   
 @app.get("/posts")
 def get_posts():
-  return {"data" : my_post}
+  cursor.execute("SELECT * FROM posts")
+  posts = cursor.fetchall()
+  return {"data" : posts}
+
 
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_posts(payload: Post):
-  print(payload)
-  length = len(my_post)
-  payload.id = length + 1
-  
-  my_post.append(payload)
-  return {"data" : my_post}
+def create_posts(payload: CreatePost):
+  cursor.execute("INSERT INTO posts (title, content ) VALUES (%s, %s) RETURNING *", (payload.title, payload.content))
+  post = cursor.fetchone()
+  conn.commit()
+  return {"data" : post}
 
 
 @app.get("/posts/{id}")
@@ -95,8 +94,10 @@ def delete_post(id: int):
   
   if not post:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+  
+  cursor.execute("DELETE FROM posts WHERE id = %s", (id,))
+  conn.commit()
 
-  my_post.remove(post)
   return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.put("/posts/{id}")
@@ -106,13 +107,8 @@ def update_post(id: int, payload: Post):
   if not post:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
-  
-  post.title = payload.title
-  post.content = payload.content
-  post.published = payload.published
-  
-  my_post.remove(post)
-  my_post.append(post)
+  cursor.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s RETURNING *", (payload.title, payload.content, id))
+  conn.commit()
   
   return {"data": post}
       
