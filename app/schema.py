@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing_extensions import Literal
 from datetime import datetime
 from typing import Optional
 
@@ -20,6 +21,13 @@ class Post(PostBase):
   
   class Config:
     # orm_mode = True
+    from_attributes = True
+    
+class PostResponse(BaseModel):
+  Post: Post
+  votes: int
+  
+  class Config:
     from_attributes = True
   
   
@@ -53,3 +61,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
    sub: Optional[str] = None
    user_id: Optional[int] = None
+
+class Vote(BaseModel):
+  post_id: int
+  dir : Literal[0, 1]
