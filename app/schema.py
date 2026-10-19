@@ -6,13 +6,18 @@ class PostBase(BaseModel):
   title : str
   content: str
   
+class User(BaseModel):
+    email: EmailStr
+    password: str 
+  
   
 class Post(PostBase):
   id: int
   published: bool = True
   created_at: datetime
   owner_id: int
-  # owner: User
+  owner: UserResponse
+  
   class Config:
     # orm_mode = True
     from_attributes = True
@@ -24,9 +29,7 @@ class CreatePost(PostBase):
 class UpdatePost(CreatePost):
   pass
 
-class User(BaseModel):
-    email: EmailStr
-    password: str 
+
     
 class RegisterDto(User):
     pass
