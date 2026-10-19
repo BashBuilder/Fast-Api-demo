@@ -11,6 +11,8 @@ class Post(PostBase):
   id: int
   published: bool = True
   created_at: datetime
+  owner_id: int
+  # owner: User
   class Config:
     # orm_mode = True
     from_attributes = True

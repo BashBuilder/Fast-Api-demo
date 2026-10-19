@@ -3,7 +3,6 @@ from ..database import get_db
 from ..schema import CreatePost, UpdatePost, Post
 from .. import models, oauth2
 from sqlalchemy.orm import Session
-from .. import schema
 
 router = APIRouter( prefix="/posts", tags=["Posts"])
 
@@ -15,9 +14,8 @@ def get_posts(db : Session = Depends(get_db)):
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=Post)
-def create_posts(payload: CreatePost, db : Session = Depends(get_db),  user : schema.TokenData = Depends(oauth2.get_current_user)):
-  print(user)
-  post = models.Post(**payload.model_dump())
+def create_posts(payload: CreatePost, db : Session = Depends(get_db),  user : models.User = Depends(oauth2.get_current_user)):
+  post = models.Post(owner_id=user.id, **payload.model_dump())
   
   db.add(post)
   db.commit()
@@ -36,10 +34,13 @@ def get_post(id: int, db : Session = Depends(get_db)):
 
   
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id: int, db : Session = Depends(get_db), user : schema.TokenData = Depends(oauth2.get_current_user)):
+def delete_post(id: int, db : Session = Depends(get_db), user : models.User = Depends(oauth2.get_current_user)):
   post = db.query(models.Post).filter(models.Post.id == id).first()
   if not post:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+  
+  if str(post.owner_id) != str(user.id):
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the owner of this post")
   
   db.delete(post)
   db.commit()
@@ -47,11 +48,16 @@ def delete_post(id: int, db : Session = Depends(get_db), user : schema.TokenData
   return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.put("/{id}", response_model=Post)
-def update_post(id: int, payload: UpdatePost, db : Session = Depends(get_db), user : schema.TokenData = Depends(oauth2.get_current_user)):
+def update_post(id: int, payload: UpdatePost, db : Session = Depends(get_db), user : models.User = Depends(oauth2.get_current_user)):
   post = db.query(models.Post).filter(models.Post.id == id)
+  new_post = post.first()
   
-  if not post.first():
+  if not new_post:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+  
+  
+  if str(new_post.owner_id) != str(user.id):
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not the owner of this post")
 
   post.update(payload.model_dump(), synchronize_session=False)  # type: ignore
 

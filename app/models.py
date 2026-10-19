@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from .database import Base
 from sqlalchemy.sql.expression import text
 from sqlalchemy.dialects.postgresql import TIMESTAMP
@@ -10,6 +10,7 @@ class Post(Base):
     content = Column(String , nullable=False)
     published = Column(Boolean, server_default="TRUE", nullable=False)  
     created_at = Column(TIMESTAMP, nullable=False, server_default=text("NOW()"))
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
 class User(Base):
     __tablename__ = "users"
