@@ -28,12 +28,13 @@ def upgrade() -> None:
     sa.Column("content", sa.String(), nullable=False),
     sa.Column("published", sa.Boolean(), nullable=False),
     sa.Column("created_at", TIMESTAMP(), nullable=False),
-    sa.Column("owner_id", sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(["owner_id"], ["users.id"], ondelete="CASCADE"),
+    # sa.Column("owner_id", sa.Integer(), nullable=False),
+    # sa.ForeignKeyConstraint(["owner_id"], ["users.id"], ondelete="CASCADE"),
     sa.PrimaryKeyConstraint("id"),
   )
-  """Upgrade schema."""
+  # """Upgrade schema."""
 
 
 def downgrade() -> None:
-  """Downgrade schema."""
+  op.drop_table("posts")
+  # """Downgrade schema."""
