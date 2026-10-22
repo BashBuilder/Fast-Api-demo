@@ -1,4 +1,5 @@
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnusedImport=false
+import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
 
@@ -37,3 +38,25 @@ def test_login(client: TestClient, test_user: dict[str, str]) -> None:
   )
   assert payload["sub"] == test_user["email"]
   assert payload["user_id"] == test_user["id"]
+
+
+@pytest.mark.parametrize(
+  "email, password, status_code",
+  [
+    ("test1@test.com", "wrongpassword", 401),
+    ("wrongemail@test.com", "test", 404),
+    (None, "test", 422),
+    ("test1@test.com", "", 422),
+    ("test1@test.com", None, 422),
+  ],
+)
+def test_incorrect_login(
+  client: TestClient,
+  test_user: dict[str, str],
+  email: str,
+  password: str,
+  status_code: int,
+) -> None:
+  response = client.post("/login", data={"username": email, "password": password})
+
+  assert response.status_code == status_code
