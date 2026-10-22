@@ -1,7 +1,9 @@
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnusedImport=false
 from fastapi.testclient import TestClient
+from jose import jwt
 
 from app import schema
+from app.config import settings
 
 from .database import client, session  # noqa: F401
 
@@ -23,12 +25,15 @@ def test_register(client: TestClient) -> None:
   assert new_user.id is not None
 
 
-def test_login(client: TestClient) -> None:
+def test_login(client: TestClient, test_user: dict[str, str]) -> None:
   response = client.post(
-    "/login", json={"username": "test1@test.com", "password": "test"}
+    "/login", data={"username": test_user["email"], "password": test_user["password"]}
   )
 
   assert response.status_code == 200
   token = schema.Token.model_validate(response.json())
-  assert token.access_token is not None
-  assert token.token_type is not None
+  payload = jwt.decode(
+    token.access_token, settings.secret_key, algorithms=[settings.algorithm]
+  )
+  assert payload["sub"] == test_user["email"]
+  assert payload["user_id"] == test_user["id"]
