@@ -120,3 +120,11 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -v
+  deploy:
+    environment:
+      name: production
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
